@@ -78,9 +78,9 @@ Criamos variáveis sintéticas para melhorar a precisão do modelo, como a Reser
 
 2. **Modelos em Teste**
 O time está testando múltiplos algoritmos para encontrar o campeão em Recall:
-- Regressão Logística (Baseline) -> `03_1_model_RegLog.ipynb`
-- Árvore de Decisão (Explicabilidade) -> `03_2_model_ArvDec.ipynb`
-- Random Forest (Robustez) -> `03_3_model_RanFor.ipynb`
-- SVM (Fronteiras Complexas) -> `03_4_model_SVM.ipynb`
-- KNN (Similaridade) -> `03_5_model_KNN.ipynb`
-- Redes Neurais (Deep Learning) -> `03_6_model_RN.ipynb`
+- Regressão Logística -> `03_1_model_RegLog.ipynb`
+- Árvore de Decisão -> `03_2_model_ArvDec.ipynb`
+- Random Forest -> `03_3_model_RanFor.ipynb`
+- SVM -> `03_4_model_SVM.ipynb`
+- KNN -> `03_5_model_KNN.ipynb`
+- Redes Neurais -> `03_6_model_RN.ipynb`
