@@ -22,20 +22,22 @@ Uma triagem humana tradicional, baseada na pergunta *"O senhor sente dor?"*, fal
 O projeto simula um fluxo de Data Science profissional, com pré-processamento centralizado e modelagem distribuída:
 
 ```text
-📁 projeto-cardio-sentinel/
+📁 ligia-ps26-time7/
 │
 ├── 📁 data/
-│   ├── raw/                 # Dados originais (heart_cleveland_upload.csv)
-│   └── processed/           # Dados limpos e prontos (.pkl) gerados pelo notebook 02
+│   ├── heart-disease-cleveland-uci/    # Dados originais 
+│   └── processed/           # Dados limpos e prontos (.pkl)
 │
-├── 📁 models/               # Modelos treinados salvos (.pkl)
+├── 📁 models/              # Modelos treinados (.pkl) e metadados
 │
-├── 📓 01_analise_exploratoria.ipynb       # EDA: Gráficos, estatísticas e insights de negócio
-├── 📓 02_preprocessing_unificado.ipynb    # Engenharia de features e split (Gera os arquivos .pkl)
-├── 📓 03_treinamento_TEMPLATE.ipynb       # Base para treino dos modelos (SVM, Random Forest, etc.)
+├── 📓 01_analise_exploratoria.ipynb      
+├── 📓 03_pre_processamento.ipynb    
+├── 📓 03_<num>_model_<nome>.ipynb       
+├── 📓 04_comite_decisao.ipynb           
 │
+├── 📜 app.py                # Aplicação Web (Streamlit)
 ├── 📜 requirements.txt      # Lista de dependências
-└── 📜 README.md             # Este manual
+└── 📜 README.md             
 ```
 
 ## 🚀 Como Rodar o Projeto (Passo a Passo)
@@ -62,8 +64,23 @@ pip install -r requirements.txt
 ```
 
 ### Passo 3: Executar o Pipeline
-```text
-TO-DO
+A execução deve seguir uma ordem lógica para garantir que os arquivos .pkl existam antes de serem usados:
+1. **Pré-processamento (Obrigatório):**
+- Abra e execute todas as células do notebook `02_pre_processamento.ipynb`.
+- O que ele faz: Limpa os dados, cria as novas features e salva os artefatos na pasta models/deploy e data/processed/.
+
+2. **Treinamento dos Modelos:**
+- Execute os notebooks de treino (ex: `03_4_model_SVM.ipynb`).
+- Isso vai treinar os algoritmos e salvar os modelos individuais (.pkl) na pasta models/.
+
+3. **Criação do Comitê:**
+- Execute o `04_comite_decisao.ipynb`.
+- Ele lerá todos os modelos treinados, escolherá os 3 melhores e criará o `modelo_FINAL_Comite.pkl`.
+
+### Passo 4: Rodar a aplicação (Interface visual)
+Com o modelo final salvo, execute o comando abaixo no terminal para abrir o CardioSentinel no seu navegador:
+```bash
+streamlit run app.py
 ```
 
 ## 📊 Resultados Preliminares
