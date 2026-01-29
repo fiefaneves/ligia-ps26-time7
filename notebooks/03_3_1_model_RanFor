@@ -1,178 +1,184 @@
-# 🏥 Projeto LIGIA - Time 7: Triagem Cardíaca com Random Forest
+# ⚡ Treinamento de Modelo: Random Forest (Fase 3 - Time 7)
 
-Este notebook documenta o pipeline completo de treinamento, validação e relatório técnico do modelo de Inteligência Artificial desenvolvido para auxiliar na triagem de risco cardíaco em UPAs.
+**Responsável:** Time 7 (LIGIA)
+**Algoritmo:** Random Forest
 
-**Metodologia:**
-1. **Coleta:** Dataset *Cleveland Heart Disease* (UCI).
-2. **Preparo:** Divisão 80/20 e Balanceamento Estratificado (Upsampling).
-3. **Modelagem:** Teste de hiperparâmetros (10 a 500 árvores).
-4. **Avaliação:** Foco em Sensibilidade (Recall) para segurança do paciente.
+**Objetivos deste Notebook:**
+1. **Carregar:** Importar e preparar os dados (Pipeline integrado).
+2. **Treinar:** Ajustar o modelo Random Forest (Baseline vs Otimizado).
+3. **Avaliar:** Medir performance com foco no **Recall** (Sensibilidade) e aplicar threshold de segurança (0.41).
+4. **Validar:** Teste de Fogo no grupo de risco "Assintomático" (Isquemia Silenciosa).
 
-# Instalação silenciosa da biblioteca do Kaggle (caso não exista)
-try:
-    import kagglehub
-except ImportError:
-    !pip install -q kagglehub
-    import kagglehub
+**Métricas Chave:**
+* **Recall (Sensibilidade):** Prioridade máxima. Não podemos deixar doentes irem para casa.
+* **F1-Score:** Garantia de equilíbrio para evitar falsos positivos excessivos.
 
 import pandas as pd
 import numpy as np
-import os
-import shutil
 import seaborn as sns
 import matplotlib.pyplot as plt
+import joblib
+import os
+import json
+import kagglehub
+import shutil
 
-from sklearn.model_selection import train_test_split
+# Métricas e Ferramentas
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.utils import resample
-from sklearn.metrics import recall_score, accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, recall_score, roc_auc_score, f1_score, ConfusionMatrixDisplay
 
-# Configuração de estilo dos gráficos
+# Configuração visual
 sns.set_theme(style="whitegrid")
-print("✅ Ambiente configurado com sucesso.")
 
-# --- 1. AQUISIÇÃO DE DADOS ---
-print("🔄 Buscando dataset...")
+# --- 1. AQUISIÇÃO E PREPARAÇÃO (Adaptado para rodar sem arquivos locais) ---
+print("🔄 Preparando dados...")
+
+# Download ou Fallback
 try:
-    # Tenta baixar via KaggleHub
     path_cache = kagglehub.dataset_download("cherngs/heart-disease-cleveland-uci")
     arquivo_csv = [f for f in os.listdir(path_cache) if f.endswith('.csv')][0]
     df = pd.read_csv(os.path.join(path_cache, arquivo_csv))
-    print("✅ Download via Kaggle concluído.")
 except:
-    # Fallback: URL direta caso o Kaggle falhe
-    print("⚠️ Kaggle indisponível. Usando mirror alternativo...")
     url = "https://raw.githubusercontent.com/asthasharma98/Heart-Disease-Prediction-Deployment/master/heart_cleveland_upload.csv"
     df = pd.read_csv(url)
-    print("✅ Download via Mirror concluído.")
 
-# --- 2. DIVISÃO TREINO/TESTE ---
+# Divisão X e y
 X = df.drop('condition', axis=1)
 y = df['condition']
 
-# Divisão 80/20 com semente fixa para reprodutibilidade
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Split 80/20
+X_train_raw, X_test, y_train_raw, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# --- 3. BALANCEAMENTO ESTRATIFICADO (SÓ NO TREINO) ---
-print("\n⚖️ Aplicando Balanceamento Estratificado (Upsampling)...")
-
-# Junta X e y temporariamente
-df_train = pd.concat([X_train, y_train], axis=1)
-
-# Cria "strata" combinando Sexo + Condição para garantir que minorias sejam representadas
-# Ex: Mulheres Doentes (grupo raro) serão multiplicadas
+# Balanceamento Estratificado (Upsampling no Treino)
+print("⚖️ Aplicando Balanceamento Estratificado...")
+df_train = pd.concat([X_train_raw, y_train_raw], axis=1)
 df_train['strata'] = df_train['sex'].astype(str) + "_" + df_train['condition'].astype(str)
 max_size = df_train['strata'].value_counts().max()
 
 lista_dfs = []
 for grupo in df_train['strata'].unique():
     df_grupo = df_train[df_train['strata'] == grupo]
-    # Upsampling com reposição
     df_res = resample(df_grupo, replace=True, n_samples=max_size, random_state=42)
     lista_dfs.append(df_res)
 
-# Reconstrói o treino final
 df_train_bal = pd.concat(lista_dfs)
-X_train_bal = df_train_bal.drop(['condition', 'strata'], axis=1)
-y_train_bal = df_train_bal['condition']
+X_train = df_train_bal.drop(['condition', 'strata'], axis=1)
+y_train = df_train_bal['condition']
 
-print(f"📊 Linhas Originais de Treino: {len(X_train)}")
-print(f"📊 Linhas Balanceadas de Treino: {len(X_train_bal)} (Pronto para modelagem)")
+print(f"✅ Dados prontos!")
+print(f"Treino Balanceado: {X_train.shape}")
+print(f"Teste: {X_test.shape}")
 
-# Lista de configurações para testar
-lista_arvores = [10, 50, 100, 200, 500]
-resultados = []
+# --- 2. TREINAMENTO (Baseline vs Otimizado) ---
 
-print("🧠 Iniciando treinamento de modelos...")
-print(f"{'Arvores':<10} | {'Acurácia':<10} | {'Recall':<10} | {'F1-Score':<10}")
-print("-" * 46)
+# A. Baseline
+print("🌲 Treinando Baseline (Padrão)...")
+model_baseline = RandomForestClassifier(random_state=42, n_jobs=-1)
+model_baseline.fit(X_train, y_train)
+recall_base = recall_score(y_test, model_baseline.predict(X_test))
+print(f"   Recall Baseline: {recall_base:.2%}")
 
-for n in lista_arvores:
-    # Treina no Balanceado, Testa no Original (X_test)
-    modelo = RandomForestClassifier(n_estimators=n, random_state=42)
-    modelo.fit(X_train_bal, y_train_bal)
-    previsoes = modelo.predict(X_test)
+# B. Otimização (GridSearchCV)
+print("\n🔍 Iniciando busca pelos melhores parâmetros (Isso pode levar alguns segundos)...")
 
-    acc = accuracy_score(y_test, previsoes)
-    rec = recall_score(y_test, previsoes)
-    f1 = f1_score(y_test, previsoes)
+param_grid = {
+    "n_estimators": [50, 100, 200],
+    "max_depth": [None, 5, 10],
+    "min_samples_split": [2, 5],
+    "min_samples_leaf": [1, 2],
+    "max_features": ["sqrt"]
+}
 
-    resultados.append({
-        'arvores': n,
-        'acuracia': acc,
-        'recall': rec,
-        'f1': f1,
-        'model_obj': modelo
-    })
-    
-    print(f"{n:<10} | {acc:.1%}    | {rec:.1%}    | {f1:.1%}")
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
-# Seleção do Campeão: Melhor F1, com Recall como desempate
-campeao = sorted(resultados, key=lambda x: (x['f1'], x['recall']), reverse=True)[0]
-modelo_final = campeao['model_obj']
-y_pred_final = modelo_final.predict(X_test)
+grid_search = GridSearchCV(
+    estimator=RandomForestClassifier(random_state=42, n_jobs=-1),
+    param_grid=param_grid,
+    cv=cv,
+    scoring='recall', # Foco total em não perder doentes
+    n_jobs=-1,
+    verbose=0
+)
 
-# Dados para o relatório
-matriz = confusion_matrix(y_test, y_pred_final)
-vn, fp, fn, vp = matriz.ravel()
-total_pacientes = vn + fp + fn + vp
+grid_search.fit(X_train, y_train)
+best_model = grid_search.best_estimator_
 
-### 📄 Análise Técnica do Modelo
+print("-" * 40)
+print(f"🏆 Melhor Recall na Validação Cruzada: {grid_search.best_score_:.2%}")
+print(f"⚙️ Melhores Parâmetros: {grid_search.best_params_}")
 
-A **Random Forest** utiliza múltiplas árvores de decisão simultâneas para reduzir o risco de erro humano e overfitting. O objetivo deste modelo é atuar como uma segunda opinião de segurança em UPAs.
+# --- 3. AVALIAÇÃO DE PERFORMANCE (Threshold Ajustado) ---
 
-**Destaques da Estratégia:**
-* **Balanceamento Estratificado:** A IA estudou a mesma quantidade de casos para 4 grupos distintos (Homens Saudáveis/Doentes, Mulheres Saudáveis/Doentes). Isso reduz o viés histórico e melhora a detecção em mulheres.
-* **Hierarquia de Sintomas:** O modelo validou que *Dor no Peito (cp)* e *Talassemia (thal)* continuam sendo os maiores preditores de risco cardíaco.
+# Probabilidades (0 a 1)
+y_proba = best_model.predict_proba(X_test)[:, 1]
 
-print("\n" + "="*80)
-print(f"{'📄 RELATÓRIO TÉCNICO DE INTELIGÊNCIA ARTIFICIAL - LIGIA TIME 7':^80}")
-print("="*80)
+# Limiar personalizado para maximizar segurança (Conforme documento original)
+limiar = 0.41
+y_pred_ajustado = (y_proba >= limiar).astype(int)
 
-print(f"\n1. RESUMO EXECUTIVO")
-print(f"Modelo de triagem cardíaca otimizado via F1-Score para maximizar a segurança.")
-print(f"• Configuração Vencedora: Random Forest com {campeao['arvores']} árvores.")
-print(f"• Dados: Divisão 80/20 com Balanceamento Estratificado.")
+recall_final = recall_score(y_test, y_pred_ajustado)
 
-print(f"\n2. PERFORMANCE DO MELHOR MODELO (Métricas na Prova Real)")
-print(f"-"*60)
-print(f"  MÉTRICA                  | VALOR OBTIDO  | INTERPRETAÇÃO")
-print(f"-"*60)
-print(f"  🩺 Recall (Sensibilidade) | {campeao['recall']:>6.2%}        | De cada 100 doentes, detectamos {campeao['recall']*100:.0f}.")
-print(f"  🎯 Acurácia Global        | {campeao['acuracia']:>6.2%}        | Taxa geral de acertos.")
-print(f"  ⚖️ F1-Score               | {campeao['f1']:>6.2%}        | Equilíbrio precisão/recall.")
-print(f"-"*60)
+print(f"📈 Evolução do Recall no Teste:")
+print(f"   - Baseline:  {recall_base:.2%}")
+print(f"   - Otimizado (Limiar {limiar}): {recall_final:.2%}")
 
-print(f"\n3. ANÁLISE DE ERRO (Matriz de Confusão)")
-print(f"Total de pacientes testados: {total_pacientes}")
-print(f"\n   [ REALIDADE ]")
-print(f"         |   Saudável   |    Doente    |")
-print(f" PRED    |--------------|--------------|")
-print(f" I  Saud |      {vn:<2}      |      {fn:<2}      | <-- Falsos Negativos (Risco Crítico)")
-print(f" Ç  Doen |      {fp:<2}      |      {vp:<2}      | <-- Verdadeiros Positivos (Sucesso)")
-print(f" Ã  -----|--------------|--------------|")
-print(f" O")
-
-print(f"\n >> CONCLUSÃO CLÍNICA:")
-if fn == 0:
-    print(f" ✅ EXCELENTE: Risco zero de alta indevida (0 Falsos Negativos).")
-elif fn <= 3:
-    print(f" ✅ BOM: Apenas {fn} caso(s) perdido(s). Triagem humana atua como backup.")
-else:
-    print(f" ⚠️ ATENÇÃO: Perda de {fn} casos. Necessário ajuste de threshold.")
-
-print(f"\n4. FATORES DECISIVOS (Feature Importance)")
-importancias = pd.Series(modelo_final.feature_importances_, index=X.columns).sort_values(ascending=False).head(3)
-for i, (nome, valor) in enumerate(importancias.items(), 1):
-    print(f"  {i}º Fator: {nome.upper()} (Impacto: {valor:.1%})")
-
-print("\n" + "="*80)
-
-plt.figure(figsize=(7, 5))
-sns.heatmap(matriz, annot=True, fmt='d', cmap='Blues', cbar=False,
-            xticklabels=['Pred: Saudável', 'Pred: Doente'],
-            yticklabels=['Real: Saudável', 'Real: Doente'])
-plt.title('Matriz de Confusão Visual')
-plt.ylabel('Realidade')
-plt.xlabel('Previsão do Modelo')
+# Matriz de Confusão
+plt.figure(figsize=(6, 5))
+ConfusionMatrixDisplay.from_predictions(y_test, y_pred_ajustado, cmap='Blues', display_labels=['Saudável', 'Doente'])
+plt.title(f'Matriz de Confusão (Threshold {limiar})')
+plt.grid(False)
 plt.show()
+
+print("\n" + classification_report(y_test, y_pred_ajustado))
+print(f"AUC-ROC Score: {roc_auc_score(y_test, y_proba):.4f}")
+
+# --- 4. VALIDAÇÃO NO SUBGRUPO ASSINTOMÁTICO (Teste de Fogo) ---
+print(f"🕵️ Analisando isquemia silenciosa (Pacientes sem dor típica)...")
+
+# Filtrando dados: No dataset Cleveland, cp (Chest Pain) == 3 é Assintomático
+# (Nota: Adaptado do código original que usava One-Hot 'cp_3')
+mask_assin = X_test['cp'] == 3
+X_test_sub = X_test[mask_assin]
+y_test_sub = y_test[mask_assin.values]
+
+if len(X_test_sub) > 0:
+    # Aplicando o limiar de segurança
+    y_proba_sub = best_model.predict_proba(X_test_sub)[:, 1]
+    y_pred_sub = (y_proba_sub >= limiar).astype(int)
+    
+    recall_sub = recall_score(y_test_sub, y_pred_sub)
+    
+    print("-" * 50)
+    print(f"RESULTADO DO TESTE DE FOGO (Limiar {limiar}):")
+    print(f"   Pacientes Assintomáticos no Teste: {len(X_test_sub)}")
+    print(f"   Recall (Doentes detectados): {recall_sub:.2%}")
+    print("-" * 50)
+    
+    if recall_sub > 0.85:
+        print("✅ SUCESSO: O modelo é excelente em detectar isquemia silenciosa!")
+    else:
+        print("⚠️ ATENÇÃO: O recall caiu neste grupo. Considere baixar ainda mais o limiar.")
+else:
+    print("Nenhum paciente assintomático na amostra de teste.")
+
+# --- 5. EXPORTAÇÃO DO MODELO ---
+os.makedirs('models', exist_ok=True)
+
+# 1. Salva o Modelo .pkl
+caminho_final = 'models/modelo_RandomForest_Otimizado.pkl'
+joblib.dump(best_model, caminho_final)
+
+# 2. Salva o Metadata (Crucial para a aplicação saber o threshold)
+metadata = {
+    "algoritmo": "RandomForestClassifier",
+    "threshold_otimizado": limiar,
+    "input_features": list(X.columns)
+}
+
+with open('models/metadata_RandomForest.json', 'w') as f:
+    json.dump(metadata, f)
+
+print(f"💾 Modelo salvo em: {caminho_final}")
+print(f"📄 Metadata salvo (Threshold {limiar} registrado).")
