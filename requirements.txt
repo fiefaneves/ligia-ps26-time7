@@ -120,3 +120,4 @@ websocket-client==1.9.0
 widgetsnbextension==4.0.15
 kagglehub==0.4.1
 kagglesdk==0.1.15
+streamlit==1.53.1
