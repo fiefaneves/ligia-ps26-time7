@@ -1,6 +1,10 @@
-# ❤️ Sistema Inteligente de Triagem Cardíaca
-
+# ❤️ CardioAI
 > **Desafio LIGIA 2026 - Time 7 (Startup Simulada)**
+
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-red)
+![Sklearn](https://img.shields.io/badge/ML-Scikit--Learn-orange)
+![Status](https://img.shields.io/badge/Status-Concluído-success)
 
 ## 🎯 Sobre o Projeto
 Somos uma solução de Inteligência Artificial desenvolvida para auxiliar equipes médicas em Unidades de Pronto Atendimento (UPAs).
@@ -26,14 +30,16 @@ O projeto simula um fluxo de Data Science profissional, com pré-processamento c
 │
 ├── 📁 data/
 │   ├── heart-disease-cleveland-uci/    # Dados originais 
-│   └── processed/           # Dados limpos e prontos (.pkl)
+│   └── processed/                      # Dados limpos e prontos (.pkl)
 │
-├── 📁 models/              # Modelos treinados (.pkl) e metadados
+├── 📁 models/                              # Artefatos do modelo
+│   └── modelo_RedesNeurais_Otimizado.pkl   # O Cérebro da IA
 │
-├── 📓 01_analise_exploratoria.ipynb      
-├── 📓 03_pre_processamento.ipynb    
-├── 📓 03_<num>_model_<nome>.ipynb       
-├── 📓 04_comite_decisao.ipynb           
+├── 📓 notebooks/                           # Análise e Treinamento
+│   ├── 01_analise_exploratoria.ipynb
+│   ├── 02_pre_processamento.ipynb (Pipeline Blindado)
+│   ├── 03_xx_treinamento_modelos.ipynb      
+│   └── 04_comite_decisao.ipynb           
 │
 ├── 📜 app.py                # Aplicação Web (Streamlit)
 ├── 📜 requirements.txt      # Lista de dependências
@@ -41,24 +47,28 @@ O projeto simula um fluxo de Data Science profissional, com pré-processamento c
 ```
 
 ## 🚀 Como Rodar o Projeto (Passo a Passo)
+Siga os passos abaixo no seu terminal.
 
-Se você nunca rodou um projeto Python antes, não se preocupe! Siga os passos abaixo no seu terminal (tela preta do VS Code).
+### Pré-requisitos:
+- Python 3.8 ou superior
+- Git
+
+### Passo 0: Clone o repositório e entre na pasta
+```bash
+git clone [https://github.com/SEU_USUARIO/ligia-ps26-time7.git](https://github.com/SEU_USUARIO/ligia-ps26-time7.git)
+cd ligia-ps26-time7
+```
 
 ### Passo 1: Criar e Ativar o Ambiente Virtual
-Isso cria uma "caixa isolada" para não bagunçar seu computador.
 ```bash
-# 1. Criar a venv
 python3 -m venv venv
-
-# 2. Ativar a venv (Linux/Mac)
-source venv/bin/activate
-
-# 2. Ativar a venv (Windows)
+# Windows:
 venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 ```
 
 ### Passo 2:  Instalar as Dependências
-Agora vamos baixar as ferramentas necessárias (Pandas, Seaborn, Scikit-Learn, etc) listadas no arquivo `requirements.txt.`
 ```bash
 pip install -r requirements.txt
 ```
@@ -75,19 +85,20 @@ A execução deve seguir uma ordem lógica para garantir que os arquivos .pkl ex
 
 3. **Criação do Comitê:**
 - Execute o `04_comite_decisao.ipynb`.
-- Ele lerá todos os modelos treinados, escolherá os 3 melhores e criará o `modelo_FINAL_Comite.pkl`.
+- Ele lerá todos os modelos treinados, escolherá os 3 melhores e criará o `modelo_VotingClassifier.pkl`.
 
 ### Passo 4: Rodar a aplicação (Interface visual)
-Com o modelo final salvo, execute o comando abaixo no terminal para abrir o CardioSentinel no seu navegador:
+Com o modelo final salvo, execute o comando abaixo no terminal para abrir o CardioAI no seu navegador:
 ```bash
 streamlit run app.py
 ```
 
-## 📊 Resultados Preliminares
-Na nossa análise inicial, identificamos que o dataset Heart Disease é ideal porque:
-1. Balanceado: Temos quase a mesma quantidade de pacientes doentes e saudáveis (50/50).
-2. Sinais Claros: Variáveis como Dor no Peito Assintomática e Frequência Cardíaca Máxima são fortes indicativos da doença.
-3. Auditável: Conseguimos explicar medicamente o porquê de cada previsão.
+## 📊 Resultados Finais
+O modelo final (Redes Neurais), operando com um limiar de decisão ajustado para 0.20 (priorizando a segurança do paciente), obteve os seguintes resultados em dados nunca vistos:
+
+- Recall (Capacidade de detectar doentes): ~93%
+- Acurácia Global: ~85%
+- Segurança: O sistema prioriza o Falso Positivo (alertar um saudável) em vez do Falso Negativo (mandar um doente para casa).
 
 ## Metodologia Técnica
 1. **Engenharia de Features**
@@ -101,3 +112,22 @@ O time está testando múltiplos algoritmos para encontrar o campeão em Recall:
 - SVM -> `03_4_model_SVM.ipynb`
 - KNN -> `03_5_model_KNN.ipynb`
 - Redes Neurais -> `03_6_model_RN.ipynb`
+
+### 3. A Batalha: Comitê vs. Especialista
+Na fase final, tentamos superar os modelos individuais criando um **Comitê de Decisão (Ensemble Learning)**. Utilizamos um *Voting Classifier* com estratégia *Soft Voting* (média das probabilidades) combinando os 3 melhores modelos da fase anterior (Redes Neurais, KNN e RandomForest).
+
+No entanto, a validação no dataset de teste (held-out) revelou um resultado contra-intuitivo:
+
+| Arquitetura | Recall (Sensibilidade) | Diagnóstico |
+| :--- | :---: | :--- |
+| **Redes Neurais (Individual)** | **92.86%** | 🏆 **Melhor Generalização** |
+| Comitê (Ensemble) | 89.29% | Perda de performance |
+
+> **Decisão de Arquitetura:** O modelo de Redes Neurais (Multilayer Perceptron) provou ser um "especialista" tão forte que a mistura com modelos mais fracos (no Comitê) acabou diluindo a precisão. Optamos por seguir com a **Rede Neural**, garantindo menor complexidade de deploy e maior acerto.
+
+### 4. Deploy e Inferência
+O modelo final foi encapsulado em uma aplicação **Streamlit**. Para garantir a reprodutibilidade em produção:
+1.  O sistema carrega o artefato `preprocessor.pkl` (a régua de normalização original).
+2.  Recebe os dados brutos do médico.
+3.  Transforma os dados e submete à Rede Neural.
+4.  Aplica um **Limiar de Decisão Conservador (0.20)**: Se o modelo tiver mais de 20% de certeza de que é doença, ela emite o alerta. Isso prioriza a segurança do paciente (evita falsos negativos).
