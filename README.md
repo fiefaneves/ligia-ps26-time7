@@ -55,15 +55,15 @@ Siga os passos abaixo no seu terminal.
 
 ### Passo 0: Clone o repositório e entre na pasta
 ```bash
-git clone [https://github.com/SEU_USUARIO/ligia-ps26-time7.git](https://github.com/SEU_USUARIO/ligia-ps26-time7.git)
+git clone https://github.com/fiefaneves/ligia-ps26-time7
 cd ligia-ps26-time7
 ```
 
-### Passo 1: Criar e Ativar o Ambiente Virtual
+### Passo 1: Criar e Ativar o Ambiente Virtual (Opcional)
 ```bash
 python3 -m venv venv
 # Windows:
-venv\Scripts\activate
+.venv\Scripts\Activate
 # Linux/Mac:
 source venv/bin/activate
 ```
